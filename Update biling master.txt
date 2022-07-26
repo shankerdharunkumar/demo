@@ -1,0 +1,120 @@
+
+//controller
+@PutMapping("/updatebillingmaster")
+	public ResponseEntity<List<WorkFlowExecutionDTO>> updateBillingMaster(@RequestBody WorkFlowExecutionDTO workFlowExecutionDTO,
+			HttpServletRequest request) {
+		List<WorkFlowExecutionDTO> ListUpdated = updateBillingMasterService.updateBillingMaster(workFlowExecutionDTO);
+		
+		return new ResponseEntity<>(ListUpdated, HttpStatus.OK);
+	}
+
+
+
+
+
+//Service Impl
+package org.nets.ins.webguiserver.service.impl;
+
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Arrays;
+
+import javax.persistence.Query;
+
+import org.ins.entity.BillingMaster;
+import org.ins.entity.PolicyDetails;
+import org.nets.ins.webguiserver.client.DynamicFormInterProcessService;
+import org.nets.ins.webguiserver.client.RuleServiceFeign;
+import org.nets.ins.webguiserver.repository.UpdateBillingMasterRepository;
+import org.nets.ins.webguiserver.service.UpdateBillingMasterService;
+import org.nets.util.MessageCode;
+import org.nets.util.Separator;
+import org.nets.util.config.MessageConfiguration;
+import org.nets.util.dto.WorkFlowExecutionDTO;
+import org.nets.util.dto.WorkflowDTO;
+import org.nets.util.exception.NoDataFoundException;
+import org.nets.util.repository.DynamicQueryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+
+/** 
+ * @author Dharun
+ * **/
+
+@Service
+@Transactional
+public class UpdateBillingMasterServiceImpl implements UpdateBillingMasterService {
+
+	private static final Logger logger = LoggerFactory.getLogger(UpdateBillingMasterServiceImpl.class);
+	
+	@Autowired
+	UpdateBillingMasterRepository updateBillingMasterRepository;
+	
+	@Autowired
+	DynamicQueryRepository dynamicQueryRepository;
+
+	@Autowired
+	MessageConfiguration errorMessageConfiguration;
+
+	@Autowired
+	private DynamicFormInterProcessService dynamicFormInterProcessService;
+
+	@Autowired
+	private RuleServiceFeign ruleServiceFeign;
+	
+	
+
+	public Object getEntityObject(String entityName, int id) {
+		Object entityObject = null;
+		StringBuilder query = new StringBuilder("select t from ").append(entityName).append(" as t where t.id=")
+				.append(id).append("and t.dataLog.isDeleted=").append(false);// flag to check if it is active
+		entityObject = dynamicQueryRepository.fetchSingleValue(query.toString());
+		if (entityObject == null) {
+			logger.error("getEntityObject function contain empty entityObject");
+			throw new NoDataFoundException(errorMessageConfiguration.errorMessage(MessageCode.UPS_204));
+		}
+		return entityObject;
+	}
+
+	public void getupdateBillingMaster(WorkFlowExecutionDTO workFlowExecutionDTO) {
+		StringBuilder queryString = new StringBuilder(
+				"SELECT t.payPlan, t.billType, t.paymentType, t.grossPremium, t.grossFees, t.grossTax   from PolicyDetails as t WHERE t.entityId= workFlowExecutionDTO.entityId AND t.dataLog.isDeleted =  ")
+						.append(false);
+		
+		
+		Object[] datas =(Object[]) dynamicQueryRepository.selectSingleRecord(queryString.toString());
+		Double payPlan = (Double ) datas[0];
+		Double billType =(Double ) datas[1];
+		Double paymentType = (Double ) datas[2];
+		Double grossPremium = (Double) datas[3];
+		Double grossFees = (Double ) datas[4];
+		Double grossTax = (Double ) datas[5];
+		
+		Double totalAmountDue = Double.valueOf(Math.round(grossPremium + grossFees + grossTax));
+//		 queryString = new StringBuilder("UPDATE BillingMaster SET t.totalTaxPaid = CASE WHEN t.totalTaxPaid THEN 0 END,"
+//		 		+ "SET t.totalPolicyFeesPaid = CASE WHEN totalPolicyFeesPaid THEN 0 END,");
+		queryString = new StringBuilder(Separator.UPDATE_SPACE).append("BillingMaster s s.payPlan = ?1, s.totalPolicyFeesPaid = ?2, s.payPlan = ?3")
+				.append(" WHERE  s.id= ?1");
+		Query query = dynamicQueryRepository.createQuery(queryString.toString());
+		 query.setParameter(1,payPlan);
+		 query.setParameter(2,0);
+		 query.setParameter(3,1);
+		 query.executeUpdate();
+//		System.out.println(queryString);
+//		 System.out.println();
+	}
+
+	
+
+	@Override
+	public List<WorkFlowExecutionDTO> updateBillingMaster(WorkFlowExecutionDTO workFlowExecutionDTO) {
+		return null;
+		// TODO Auto-generated method stub
+		
+	}
+}
